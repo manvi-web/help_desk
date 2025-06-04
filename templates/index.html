@@ -1,37 +1,101 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Effort Chatbot</title>
+    <title>Effort Helpdesk Chatbot</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        #chat-box { width: 500px; border: 1px solid #ccc; padding: 10px; height: 400px; overflow-y: scroll; }
-        #user-input { width: 400px; }
+        body {
+            font-family: Arial, sans-serif;
+            background: #f0f2f5;
+            margin: 0;
+            padding: 0;
+        }
+        .chat-container {
+            width: 100%;
+            max-width: 600px;
+            margin: 40px auto;
+            background: #fff;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        .chat-box {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 5px;
+            background: #fafafa;
+        }
+        .user-msg, .bot-msg {
+            margin: 10px 0;
+        }
+        .user-msg {
+            text-align: right;
+            color: #007bff;
+        }
+        .bot-msg {
+            text-align: left;
+            color: #333;
+        }
+        input[type="text"] {
+            width: 80%;
+            padding: 10px;
+            margin-top: 15px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            padding: 10px 16px;
+            font-size: 16px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
     </style>
 </head>
 <body>
-    <h2>Effort Helpdesk Chatbot</h2>
-    <div id="chat-box"></div>
-    <br>
-    <input type="text" id="user-input" placeholder="Ask a question..." />
-    <button onclick="sendMessage()">Send</button>
+    <div class="chat-container">
+        <h2>Effort Helpdesk Chatbot</h2>
+        <div class="chat-box" id="chat-box"></div>
+        <input type="text" id="user-input" placeholder="Ask your question here..." />
+        <button onclick="sendMessage()">Send</button>
+    </div>
 
     <script>
-        async function sendMessage() {
+        function sendMessage() {
             const input = document.getElementById("user-input");
             const message = input.value.trim();
             if (!message) return;
 
+            // Display user message
             const chatBox = document.getElementById("chat-box");
-            chatBox.innerHTML += `<div><strong>You:</strong> ${message}</div>`;
+            chatBox.innerHTML += `<div class="user-msg"><strong>You:</strong> ${message}</div>`;
 
-            const res = await fetch("/chat", {
+            // Send to Flask backend
+            fetch("/chat", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message })
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ message: message })
+            })
+            .then(response => response.json())
+            .then(data => {
+                const reply = data.reply || "Sorry, no response.";
+                chatBox.innerHTML += `<div class="bot-msg"><strong>Bot:</strong> ${reply}</div>`;
+                chatBox.scrollTop = chatBox.scrollHeight;  // Scroll to bottom
+            })
+            .catch(error => {
+                chatBox.innerHTML += `<div class="bot-msg"><strong>Bot:</strong> Error connecting to server.</div>`;
+                console.error(error);
             });
-            const data = await res.json();
-            chatBox.innerHTML += `<div><strong>Bot:</strong> ${data.reply}</div>`;
-            chatBox.scrollTop = chatBox.scrollHeight;
+
             input.value = "";
         }
     </script>
