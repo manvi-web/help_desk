@@ -3,10 +3,11 @@ from flask import Flask, request, jsonify, render_template, session
 import pandas as pd
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key'  # Needed for session to store last question
+app.secret_key = 'your_secret_key'  # Needed for session
 
-# Load chatbot data
-df = pd.read_csv('effort_chatbot_data.csv')
+# Load CSV data
+csv_path = os.path.join(os.path.dirname(__file__), 'effort_chatbot_data.csv')
+df = pd.read_csv(csv_path)
 
 @app.route("/")
 def home():
@@ -16,8 +17,9 @@ def home():
 def chat():
     user_input = request.json.get("message", "").strip().lower()
 
-    # Check for interest follow-up
-    if user_input in ["i'm interested", "im interested", "interested", "tell me more", "more info"]:
+    # Handle "I'm interested"
+    interested_phrases = ["i'm interested", "im interested", "interested", "more info", "tell me more"]
+    if user_input in interested_phrases:
         last_question = session.get("last_question", "")
         if last_question:
             match = df[df['question'].str.lower() == last_question.lower()]
@@ -26,19 +28,19 @@ def chat():
                 url = match.iloc[0]['URL']
                 return jsonify({"reply": f"{full_answer}<br><br><a href='{url}' target='_blank'>Read more</a>"})
             else:
-                return jsonify({"reply": "Sorry, no more info found."})
+                return jsonify({"reply": "Sorry, I couldn't find more info on that."})
         return jsonify({"reply": "Please ask a question first."})
 
-    # Match user's question
+    # Normal question matching
     match = df[df['question'].str.lower().str.contains(user_input, na=False)]
+
     if not match.empty:
         short_answer = match.iloc[0]['short_answer']
         session['last_question'] = match.iloc[0]['question']
-        return jsonify({"reply": f"{short_answer}<br><br>Want to know more? Type 'I'm interested'."})
+        return jsonify({"reply": f"{short_answer}<br><br>Type 'I'm interested' to know more."})
     else:
         return jsonify({"reply": "Sorry, I don't know the answer to that."})
 
-# Run the app
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # Important for Render
+    port = int(os.environ.get("PORT", 5000))  # Required for Render
     app.run(host="0.0.0.0", port=port)
