@@ -41,7 +41,6 @@ def chat():
     else:
         return jsonify({"reply": "Sorry, I don't know the answer to that."})
 
-# Important for Render or any cloud platform to detect the port
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # Render sets PORT environment variable
+    port = int(os.environ.get("PORT", 10000))  # use 10000 as a safe default
     app.run(host="0.0.0.0", port=port)
