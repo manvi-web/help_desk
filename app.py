@@ -41,6 +41,7 @@ def chat():
     else:
         return jsonify({"reply": "Sorry, I don't know the answer to that."})
 
+# ✅ Make sure this block is properly indented
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))  # use 10000 as a safe default
+    port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
