@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Effort Helpdesk</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        #chatbox { border: 1px solid #ccc; padding: 10px; height: 400px; overflow-y: scroll; }
+        .user { color: blue; margin-bottom: 5px; }
+        .bot { color: green; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <h2>Effort Helpdesk</h2>
+    <div id="chatbox"></div>
+    <input type="text" id="message" placeholder="Ask a question..." />
+    <button onclick="sendMessage()">Send</button>
+
+    <script>
+        function sendMessage() {
+            const userMessage = document.getElementById("message").value;
+            if (!userMessage.trim()) return;
+
+            const chatbox = document.getElementById("chatbox");
+            chatbox.innerHTML += `<div class="user"><strong>You:</strong> ${userMessage}</div>`;
+            document.getElementById("message").value = "";
+
+            fetch("/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message: userMessage })
+            })
+            .then(response => response.json())
+            .then(data => {
+                chatbox.innerHTML += `<div class="bot"><strong>Bot:</strong> ${data.reply}</div>`;
+                chatbox.scrollTop = chatbox.scrollHeight;
+            })
+            .catch(error => {
+                chatbox.innerHTML += `<div class="bot"><strong>Bot:</strong> Error connecting to server.</div>`;
+            });
+        }
+    </script>
+</body>
+</html>
