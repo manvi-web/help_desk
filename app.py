@@ -6,7 +6,7 @@ app = Flask(__name__)
 app.secret_key = 'your_secret_key'  # Needed for session to store last question
 
 # Load chatbot data
-df = pd.read_csv('effort_chatbot_data.csv')
+df = pd.read_csv('chatbot_qa_dataset.csv')
 
 @app.route("/")
 def home():
