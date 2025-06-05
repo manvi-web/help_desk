@@ -4,7 +4,7 @@ import pickle
 import os
 
 # === CONFIGURATION ===
-CSV_PATH = "/home/spoors/help_desk/effort_chatbot_data.csv"
+CSV_PATH = "/home/spoors/help_desk/effort_qa_dataset.csv"
 MODEL_PATH = "chatbot_model.pkl"
 VECTORIZER_PATH = "chatbot_vectorizer.pkl"
 
