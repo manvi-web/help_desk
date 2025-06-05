@@ -1,53 +1,67 @@
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, session
 import pandas as pd
 import pickle
+import os
 
+# === CONFIGURATION ===
+CSV_PATH = "/home/spoors/help_desk/effort_chatbot_data.csv"
+MODEL_PATH = "chatbot_model.pkl"
+VECTORIZER_PATH = "chatbot_vectorizer.pkl"
+
+# === APP SETUP ===
 app = Flask(__name__)
-app.secret_key = 'your_secret_key'
+app.secret_key = 'your_secret_key'  # Needed for session
 
-# Load model and vectorizer
-model = pickle.load(open('chatbot_model.pkl', 'rb'))
-vectorizer = pickle.load(open('chatbot_vectorizer.pkl', 'rb'))
+# === DEBUG: Show working directory ===
+print("Current Working Directory:", os.getcwd())
 
-# Load CSV
-df = pd.read_csv("effort_chatbot_data.csv")
+# === LOAD FILES ===
+try:
+    df = pd.read_csv(CSV_PATH)
+    print(f"✅ Loaded CSV with {len(df)} rows.")
+except Exception as e:
+    print(f"❌ Error loading CSV: {e}")
+    raise
 
-@app.route('/')
+try:
+    model = pickle.load(open(MODEL_PATH, 'rb'))
+    vectorizer = pickle.load(open(VECTORIZER_PATH, 'rb'))
+    print("✅ Model and vectorizer loaded.")
+except Exception as e:
+    print(f"❌ Error loading model/vectorizer: {e}")
+    raise
+
+# === ROUTES ===
+@app.route('/', methods=['GET', 'POST'])
 def index():
-    return render_template('index.html')
+    answer = ""
+    full_answer = ""
+    url = ""
+    
+    if request.method == 'POST':
+        user_input = request.form.get('question', '').strip()
 
-@app.route('/chat', methods=['POST'])
-def chat():
-    data = request.get_json()
-    user_message = data.get('message', '').strip()
+        if user_input:
+            if user_input.lower() == "i'm interested" and 'last_index' in session:
+                idx = session['last_index']
+                full_answer = df.iloc[idx]['full_answer']
+                url = df.iloc[idx]['URL']
+            else:
+                # Predict
+                input_vector = vectorizer.transform([user_input])
+                prediction = model.predict(input_vector)[0]
+                
+                # Find match in CSV
+                match = df[df['question'].str.lower() == prediction.lower()]
+                if not match.empty:
+                    idx = match.index[0]
+                    answer = match.iloc[0]['short_answer']
+                    session['last_index'] = idx
+                else:
+                    answer = "Sorry, I couldn't find a relevant answer."
 
-    if not user_message:
-        return jsonify({'reply': "Please enter a question."})
+    return render_template("index.html", answer=answer, full_answer=full_answer, url=url)
 
-    # Store last question for follow-up
-    if 'last_question' not in session:
-        session['last_question'] = ''
-
-    if user_message.lower() == "i'm interested":
-        last_q = session.get('last_question', '')
-        full_row = df[df['question'] == last_q]
-        if not full_row.empty:
-            full_answer = full_row.iloc[0]['full_answer']
-            url = full_row.iloc[0]['URL']
-            return jsonify({'reply': f"{full_answer}<br><a href='{url}' target='_blank'>Read more</a>"})
-        else:
-            return jsonify({'reply': "Sorry, I couldn't find more details."})
-    else:
-        X = vectorizer.transform([user_message])
-        prediction = model.predict(X)[0]
-        session['last_question'] = prediction
-
-        row = df[df['question'] == prediction]
-        if not row.empty:
-            short_ans = row.iloc[0]['short_answer']
-            return jsonify({'reply': short_ans})
-        else:
-            return jsonify({'reply': "Sorry, I don't have an answer for that."})
-
+# === RUN ===
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=5000)
