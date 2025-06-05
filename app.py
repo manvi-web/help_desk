@@ -1,44 +1,53 @@
-import os
-from flask import Flask, request, jsonify, render_template, session
+from flask import Flask, render_template, request, jsonify, session
 import pandas as pd
+import pickle
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key'  # Needed for session to store last question
+app.secret_key = 'your_secret_key'
 
-# Load chatbot data
-df = pd.read_csv('chatbot_qa_dataset.csv')
+# Load model and vectorizer
+model = pickle.load(open('chatbot_model.pkl', 'rb'))
+vectorizer = pickle.load(open('chatbot_vectorizer.pkl', 'rb'))
 
-@app.route("/")
-def home():
-    return render_template("index.html")
+# Load CSV
+df = pd.read_csv("effort_chatbot_data.csv")
 
-@app.route("/chat", methods=["POST"])
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/chat', methods=['POST'])
 def chat():
-    user_input = request.json.get("message", "").strip().lower()
+    data = request.get_json()
+    user_message = data.get('message', '').strip()
 
-    # Check for interest follow-up
-    if user_input in ["i'm interested", "im interested", "interested", "tell me more", "more info"]:
-        last_question = session.get("last_question", "")
-        if last_question:
-            match = df[df['question'].str.lower() == last_question.lower()]
-            if not match.empty:
-                full_answer = match.iloc[0]['full_answer']
-                url = match.iloc[0]['URL']
-                return jsonify({"reply": f"{full_answer}<br><br><a href='{url}' target='_blank'>Read more</a>"})
-            else:
-                return jsonify({"reply": "Sorry, no more info found."})
-        return jsonify({"reply": "Please ask a question first."})
+    if not user_message:
+        return jsonify({'reply': "Please enter a question."})
 
-    # Match user's question
-    match = df[df['question'].str.lower().str.contains(user_input, na=False)]
-    if not match.empty:
-        short_answer = match.iloc[0]['short_answer']
-        session['last_question'] = match.iloc[0]['question']
-        return jsonify({"reply": f"{short_answer}<br><br>Want to know more? Type 'I'm interested'."})
+    # Store last question for follow-up
+    if 'last_question' not in session:
+        session['last_question'] = ''
+
+    if user_message.lower() == "i'm interested":
+        last_q = session.get('last_question', '')
+        full_row = df[df['question'] == last_q]
+        if not full_row.empty:
+            full_answer = full_row.iloc[0]['full_answer']
+            url = full_row.iloc[0]['URL']
+            return jsonify({'reply': f"{full_answer}<br><a href='{url}' target='_blank'>Read more</a>"})
+        else:
+            return jsonify({'reply': "Sorry, I couldn't find more details."})
     else:
-        return jsonify({"reply": "Sorry, I don't know the answer to that."})
+        X = vectorizer.transform([user_message])
+        prediction = model.predict(X)[0]
+        session['last_question'] = prediction
 
-# Run the app
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # Important for Render
-    app.run(host="0.0.0.0", port=port)
+        row = df[df['question'] == prediction]
+        if not row.empty:
+            short_ans = row.iloc[0]['short_answer']
+            return jsonify({'reply': short_ans})
+        else:
+            return jsonify({'reply': "Sorry, I don't have an answer for that."})
+
+if __name__ == '__main__':
+    app.run(debug=True)
