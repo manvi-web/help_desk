@@ -19,9 +19,6 @@ if not os.path.exists(CSV_PATH):
     raise FileNotFoundError(f"CSV not found at {CSV_PATH}")
 df = pd.read_csv(CSV_PATH)
 
-# Ensure 'question' column is lowercased for reliable matching
-df["question"] = df["question"].str.lower()
-
 @app.route("/", methods=["GET", "POST"])
 def index():
     answer = ""
@@ -31,22 +28,23 @@ def index():
         user_input = request.form.get("user_input", "").strip().lower()
 
         if user_input:
-            # Follow-up intent
             if user_input == "i'm interested" and "last_question" in session:
                 last_q = session["last_question"]
-                row = df[df["question"] == last_q]
+                row = df[df["question"].str.lower() == last_q]
                 if not row.empty:
-                    full_info = row.iloc[0]["full_answer"] + "<br><a href='{}' target='_blank'>Read more</a>".format(row.iloc[0]["URL"])
+                    full_answer = row.iloc[0]["full_answer"]
+                    url = row.iloc[0]["URL"]
+                    full_info = f"{full_answer}<br><a href='{url}' target='_blank'>Read more</a>"
                 else:
-                    full_info = "Sorry, I couldn't find more details."
+                    full_info = "Sorry, more details not found."
             else:
-                # Predict closest question
+                # Vectorize and predict
                 X = vectorizer.transform([user_input])
                 prediction = model.predict(X)[0]
-                predicted_question = prediction.lower()
+                predicted_question = str(prediction).lower()
                 session["last_question"] = predicted_question
 
-                row = df[df["question"] == predicted_question]
+                row = df[df["question"].str.lower() == predicted_question]
                 if not row.empty:
                     answer = row.iloc[0]["short_answer"]
                 else:
@@ -55,6 +53,4 @@ def index():
     return render_template("index.html", answer=answer, full_info=full_info)
 
 if __name__ == "__main__":
-    # Bind to PORT for Render deployment
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
