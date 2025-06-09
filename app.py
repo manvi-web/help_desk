@@ -13,10 +13,11 @@ with open("chatbot_vectorizer.pkl", "rb") as f:
 with open("chatbot_model.pkl", "rb") as f:
     model = pickle.load(f)
 
-# Load CSV file
+# Load CSV
 CSV_PATH = "chatbot_qa_dataset.csv"
 if not os.path.exists(CSV_PATH):
     raise FileNotFoundError(f"CSV file not found at {CSV_PATH}")
+
 df = pd.read_csv(CSV_PATH)
 
 @app.route("/", methods=["GET", "POST"])
@@ -28,22 +29,29 @@ def index():
         user_input = request.form.get("user_input", "").strip().lower()
 
         if user_input:
+            # Check if user is asking for full info
             if user_input == "i'm interested" and "last_question" in session:
                 last_q = session["last_question"]
-                row = df[df["question"].str.lower() == last_q]
+                row = df[df["question"].str.lower().str.contains(last_q, na=False)]
                 if not row.empty:
-                    full_info = row.iloc[0]["full_answer"] + "<br><a href='{}' target='_blank'>Read more</a>".format(row.iloc[0]["URL"])
+                    full_info = (
+                        row.iloc[0]["full_answer"]
+                        + "<br><a href='{}' target='_blank'>Read more</a>".format(row.iloc[0]["URL"])
+                    )
+                else:
+                    full_info = "Sorry, no detailed info found."
             else:
                 X = vectorizer.transform([user_input])
                 prediction = model.predict(X)[0]
                 session["last_question"] = prediction.lower()
 
-                row = df[df["question"].str.lower() == prediction.lower()]
+                row = df[df["question"].str.lower().str.contains(prediction.lower(), na=False)]
                 if not row.empty:
                     answer = row.iloc[0]["short_answer"]
+                else:
+                    answer = "Sorry, I couldn't find an answer to your question."
 
     return render_template("index.html", answer=answer, full_info=full_info)
 
-# ✅ Important: use 0.0.0.0 and port 10000 for Render
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    app.run(host="0.0.0.0", port=5000)

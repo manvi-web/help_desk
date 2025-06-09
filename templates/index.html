@@ -1,67 +1,57 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Effort Helpdesk Chatbot</title>
+    <title>Helpdesk Chatbot</title>
     <style>
         body {
             font-family: Arial, sans-serif;
+            padding: 40px;
+            background-color: #f2f2f2;
+        }
+        .chatbox {
+            width: 60%;
+            margin: auto;
+            background: white;
             padding: 30px;
-            background-color: #f8f9fa;
-        }
-        h1 {
-            color: #333;
-        }
-        form {
-            margin-bottom: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
         input[type="text"] {
             width: 80%;
             padding: 10px;
             font-size: 16px;
         }
-        input[type="submit"] {
-            padding: 10px 20px;
+        button {
+            padding: 10px 15px;
             font-size: 16px;
-            background-color: #007bff;
-            color: white;
-            border: none;
         }
-        .answer {
-            background-color: #e9ecef;
-            padding: 15px;
-            border-radius: 5px;
+        .response {
             margin-top: 20px;
-        }
-        .full-answer {
-            margin-top: 15px;
-        }
-        a {
-            color: #007bff;
-            text-decoration: none;
+            padding: 15px;
+            background: #e6f7ff;
+            border-left: 4px solid #1890ff;
         }
     </style>
 </head>
 <body>
-    <h1>Effort Helpdesk Chatbot</h1>
-    <form method="post">
-        <input type="text" name="question" placeholder="Ask your question here..." required>
-        <input type="submit" value="Ask">
-    </form>
+    <div class="chatbox">
+        <h2>Effort Helpdesk Chatbot</h2>
+        <form method="post">
+            <input type="text" name="user_input" placeholder="Ask your question here..." required>
+            <button type="submit">Ask</button>
+        </form>
 
-    {% if answer %}
-        <div class="answer">
-            <strong>Answer:</strong> {{ answer }}
-        </div>
-    {% endif %}
+        {% if answer %}
+            <div class="response">
+                <strong>Answer:</strong> {{ answer }}
+            </div>
+        {% endif %}
 
-    {% if full_answer %}
-        <div class="answer full-answer">
-            <strong>More Info:</strong><br>
-            {{ full_answer }}<br>
-            {% if url %}
-                <a href="{{ url }}" target="_blank">Read more</a>
-            {% endif %}
-        </div>
-    {% endif %}
+        {% if full_info %}
+            <div class="response" style="margin-top: 10px;">
+                <strong>More Info:</strong> {{ full_info|safe }}
+            </div>
+        {% endif %}
+    </div>
 </body>
 </html>
