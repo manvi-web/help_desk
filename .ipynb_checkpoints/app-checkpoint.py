@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, session
+ffrom flask import Flask, render_template, request, session
 import pandas as pd
 import pickle
 import os
@@ -6,14 +6,14 @@ import os
 app = Flask(__name__)
 app.secret_key = "your_secret_key"
 
-# Load vectorizer and model
+# Load model and vectorizer
 with open("chatbot_vectorizer.pkl", "rb") as f:
     vectorizer = pickle.load(f)
 
 with open("chatbot_model.pkl", "rb") as f:
     model = pickle.load(f)
 
-# Load CSV file
+# Load CSV
 CSV_PATH = "chatbot_qa_dataset.csv"
 if not os.path.exists(CSV_PATH):
     raise FileNotFoundError(f"CSV not found at {CSV_PATH}")
@@ -28,29 +28,32 @@ def index():
         user_input = request.form.get("user_input", "").strip().lower()
 
         if user_input:
-            if user_input == "i'm interested" and "last_question" in session:
-                last_q = session["last_question"]
-                row = df[df["question"].str.lower() == last_q]
-                if not row.empty:
-                    full_answer = row.iloc[0]["full_answer"]
-                    url = row.iloc[0]["URL"]
-                    full_info = f"{full_answer}<br><a href='{url}' target='_blank'>Read more</a>"
-                else:
-                    full_info = "Sorry, more details not found."
+            if user_input == "i'm interested" and "last_index" in session:
+                last_index = session["last_index"]
+                if 0 <= last_index < len(df):
+                    full = df.iloc[last_index]["full_answer"]
+                    url = df.iloc[last_index]["URL"]
+                    full_info = f"{full}<br><a href='{url}' target='_blank'>Read more</a>"
             else:
-                # Vectorize and predict
                 X = vectorizer.transform([user_input])
                 prediction = model.predict(X)[0]
-                predicted_question = str(prediction).lower()
-                session["last_question"] = predicted_question
 
-                row = df[df["question"].str.lower() == predicted_question]
-                if not row.empty:
-                    answer = row.iloc[0]["short_answer"]
+                # Handle prediction index or string
+                try:
+                    index = int(prediction)
+                except:
+                    index = df[df["question"].str.lower() == prediction.lower()].index
+                    index = index[0] if not index.empty else -1
+
+                if 0 <= index < len(df):
+                    answer = df.iloc[index]["short_answer"]
+                    session["last_index"] = index
                 else:
                     answer = "Sorry, I couldn't find an answer for that."
 
     return render_template("index.html", answer=answer, full_info=full_info)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    import os
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
