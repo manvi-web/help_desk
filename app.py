@@ -28,7 +28,6 @@ def index():
         user_input = request.form.get("user_input", "").strip().lower()
 
         if user_input:
-            # Check if user is requesting more info
             if user_input == "i'm interested" and "last_question" in session:
                 last_q = session["last_question"]
                 row = df[df["question"].str.lower() == last_q]
@@ -45,5 +44,6 @@ def index():
 
     return render_template("index.html", answer=answer, full_info=full_info)
 
+# ✅ Important: use 0.0.0.0 and port 10000 for Render
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=10000)
