@@ -4,61 +4,57 @@ import pickle
 import os
 
 app = Flask(__name__)
-app.secret_key = "your_secret_key"  # You can replace this
+app.secret_key = "your_secret_key"
 
-# Load model and vectorizer
-try:
-    with open("chatbot_vectorizer.pkl", "rb") as f:
-        vectorizer = pickle.load(f)
+# Load vectorizer and model
+with open("chatbot_vectorizer.pkl", "rb") as f:
+    vectorizer = pickle.load(f)
 
-    with open("chatbot_model.pkl", "rb") as f:
-        model = pickle.load(f)
-except Exception as e:
-    print("Error loading model or vectorizer:", e)
-    raise
+with open("chatbot_model.pkl", "rb") as f:
+    model = pickle.load(f)
 
-# Load CSV
+# Load CSV file
 CSV_PATH = "chatbot_qa_dataset.csv"
 if not os.path.exists(CSV_PATH):
     raise FileNotFoundError(f"CSV not found at {CSV_PATH}")
 df = pd.read_csv(CSV_PATH)
 
+# Ensure all questions are strings
+df["question"] = df["question"].astype(str)
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     answer = ""
     full_info = ""
-    user_input = ""
 
     if request.method == "POST":
         user_input = request.form.get("user_input", "").strip().lower()
 
         if user_input:
-            # If user asks for more info
+            # Show full answer if user is interested
             if user_input == "i'm interested" and "last_question" in session:
                 last_q = session["last_question"]
                 row = df[df["question"].str.lower() == last_q]
                 if not row.empty:
                     full_info = (
                         row.iloc[0]["full_answer"]
-                        + f"<br><a href='{row.iloc[0]['URL']}' target='_blank'>Read more</a>"
+                        + "<br><a href='{}' target='_blank'>Read more</a>".format(row.iloc[0]["URL"])
                     )
-                else:
-                    full_info = "No additional information found."
             else:
-                try:
-                    X = vectorizer.transform([user_input])
-                    prediction = model.predict(X)[0]
-                    session["last_question"] = prediction.lower()
-                    row = df[df["question"].str.lower() == prediction.lower()]
-                    if not row.empty:
-                        answer = row.iloc[0]["short_answer"]
-                    else:
-                        answer = "Sorry, I couldn't find an answer."
-                except Exception as e:
-                    answer = f"Error processing input: {str(e)}"
+                X = vectorizer.transform([user_input])
+                prediction = model.predict(X)[0]
+                prediction_str = str(prediction).lower()
+                session["last_question"] = prediction_str
 
-    return render_template("index.html", answer=answer, full_info=full_info, user_input=user_input)
+                row = df[df["question"].str.lower() == prediction_str]
+                if not row.empty:
+                    answer = row.iloc[0]["short_answer"]
+                else:
+                    answer = "Sorry, I couldn't find an answer for that."
+
+    return render_template("index.html", answer=answer, full_info=full_info)
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # ✅ Important for Render
+    # For Render compatibility
+    port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
