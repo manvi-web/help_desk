@@ -19,8 +19,8 @@ if not os.path.exists(CSV_PATH):
     raise FileNotFoundError(f"CSV not found at {CSV_PATH}")
 df = pd.read_csv(CSV_PATH)
 
-# Ensure all questions are strings
-df["question"] = df["question"].astype(str)
+# Ensure 'question' column is lowercased for reliable matching
+df["question"] = df["question"].str.lower()
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -31,22 +31,22 @@ def index():
         user_input = request.form.get("user_input", "").strip().lower()
 
         if user_input:
-            # Show full answer if user is interested
+            # Follow-up intent
             if user_input == "i'm interested" and "last_question" in session:
                 last_q = session["last_question"]
-                row = df[df["question"].str.lower() == last_q]
+                row = df[df["question"] == last_q]
                 if not row.empty:
-                    full_info = (
-                        row.iloc[0]["full_answer"]
-                        + "<br><a href='{}' target='_blank'>Read more</a>".format(row.iloc[0]["URL"])
-                    )
+                    full_info = row.iloc[0]["full_answer"] + "<br><a href='{}' target='_blank'>Read more</a>".format(row.iloc[0]["URL"])
+                else:
+                    full_info = "Sorry, I couldn't find more details."
             else:
+                # Predict closest question
                 X = vectorizer.transform([user_input])
                 prediction = model.predict(X)[0]
-                prediction_str = str(prediction).lower()
-                session["last_question"] = prediction_str
+                predicted_question = prediction.lower()
+                session["last_question"] = predicted_question
 
-                row = df[df["question"].str.lower() == prediction_str]
+                row = df[df["question"] == predicted_question]
                 if not row.empty:
                     answer = row.iloc[0]["short_answer"]
                 else:
@@ -55,6 +55,6 @@ def index():
     return render_template("index.html", answer=answer, full_info=full_info)
 
 if __name__ == "__main__":
-    # For Render compatibility
+    # Bind to PORT for Render deployment
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
