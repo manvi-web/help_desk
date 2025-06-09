@@ -6,13 +6,18 @@ import os
 app = Flask(__name__)
 app.secret_key = "your_secret_key"
 
-# Load model & vectorizer
+# === Load the model and vectorizer ===
 with open("chatbot_model.pkl", "rb") as f:
     model = pickle.load(f)
+
 with open("chatbot_vectorizer.pkl", "rb") as f:
     vectorizer = pickle.load(f)
 
-df = pd.read_csv("chatbot_qa_dataset.csv")
+# === Load the dataset ===
+CSV_PATH = "chatbot_qa_dataset.csv"
+if not os.path.exists(CSV_PATH):
+    raise FileNotFoundError(f"CSV not found at {CSV_PATH}")
+df = pd.read_csv(CSV_PATH)
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -24,18 +29,18 @@ def index():
 
         if user_input == "i'm interested" and "last_index" in session:
             idx = session["last_index"]
-            full = df.iloc[idx].get("full_answer", "Full answer not available.")
+            full_answer = df.iloc[idx].get("full_answer", "Full answer not available.")
             url = df.iloc[idx].get("URL", "")
-            full_info = f"{full}<br><a href='{url}' target='_blank'>Read more</a>" if url else full
+            full_info = f"{full_answer}<br><a href='{url}' target='_blank'>Read more</a>" if url else full_answer
         elif user_input:
             X = vectorizer.transform([user_input])
-            prediction = model.predict(X)[0]  # This should be question string
-            match = df[df["question"].str.lower() == prediction.lower()]
-            if not match.empty:
-                idx = match.index[0]
-                short = match.iloc[0]["short_answer"]
-                answer = f"Answer: {short}"
+            predicted_question = model.predict(X)[0]  # should be a string
+            matches = df[df["question"].str.lower() == predicted_question.lower()]
+            if not matches.empty:
+                idx = matches.index[0]
                 session["last_index"] = idx
+                short_answer = matches.iloc[0].get("short_answer", "No short answer found.")
+                answer = f"Answer: {short_answer}"
             else:
                 answer = "Sorry, I couldn't find an answer for that."
 
