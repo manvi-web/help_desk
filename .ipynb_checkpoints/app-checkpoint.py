@@ -1,4 +1,4 @@
-ffrom flask import Flask, render_template, request, session
+from flask import Flask, render_template, request, session
 import pandas as pd
 import pickle
 import os
