@@ -31,22 +31,23 @@ def index():
             if user_input == "i'm interested" and "last_index" in session:
                 last_index = session["last_index"]
                 if 0 <= last_index < len(df):
-                    full = df.iloc[last_index]["full_answer"]
-                    url = df.iloc[last_index]["URL"]
-                    full_info = f"{full}<br><a href='{url}' target='_blank'>Read more</a>"
+                    full = df.iloc[last_index].get("full_answer", "Full answer not available.")
+                    url = df.iloc[last_index].get("URL", "")
+                    full_info = f"{full}<br><a href='{url}' target='_blank'>Read more</a>" if url else full
             else:
                 X = vectorizer.transform([user_input])
                 prediction = model.predict(X)[0]
 
-                # Handle prediction index or string
+                # Handle both int index or text prediction
                 try:
                     index = int(prediction)
                 except:
-                    index = df[df["question"].str.lower() == prediction.lower()].index
-                    index = index[0] if not index.empty else -1
+                    match = df[df["question"].str.lower() == prediction.lower()]
+                    index = match.index[0] if not match.empty else -1
 
                 if 0 <= index < len(df):
-                    answer = df.iloc[index]["short_answer"]
+                    short = df.iloc[index].get("short_answer", "Short answer not found.")
+                    answer = f"Answer: {short}"
                     session["last_index"] = index
                 else:
                     answer = "Sorry, I couldn't find an answer for that."
