@@ -1,22 +1,15 @@
-ffrom flask import Flask, render_template, request, session
+from flask import Flask, render_template, request, session
 import pandas as pd
 import pickle
 import os
-
 app = Flask(__name__)
 app.secret_key = "supersecretkey"
-
-# Load CSV
 df = pd.read_csv("chatbot_qa_dataset.csv")
 df["question"] = df["question"].astype(str)
-
-# Load model and vectorizer
 with open("vectorizer.pkl", "rb") as f:
     vectorizer = pickle.load(f)
-
 with open("model.pkl", "rb") as f:
     model = pickle.load(f)
-
 @app.route("/", methods=["GET", "POST"])
 def index():
     response = ""
@@ -42,7 +35,6 @@ def index():
                 response = "Sorry, I couldn't find an answer for that."
 
     return render_template("index.html", response=response, full_info=full_info)
-
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
