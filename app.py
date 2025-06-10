@@ -1,40 +1,38 @@
-from flask import Flask, render_template, request, session
+from flask import Flask, render_template, request, jsonify, session
 import pandas as pd
+import numpy as np
 import pickle
 import os
 app = Flask(__name__)
-app.secret_key = "supersecretkey"
+app.secret_key = 'your_secret_key'  
 df = pd.read_csv("chatbot_qa_dataset.csv")
-df["question"] = df["question"].astype(str)
+with open("chatbot_model.pkl", "rb") as f:
+    model = pickle.load(f)
 with open("vectorizer.pkl", "rb") as f:
     vectorizer = pickle.load(f)
-with open("model.pkl", "rb") as f:
-    model = pickle.load(f)
 @app.route("/", methods=["GET", "POST"])
 def index():
-    response = ""
-    full_info = ""
+    answer = ""
+    full_answer = ""
+    url = ""
 
     if request.method == "POST":
-        user_input = request.form["message"]
+        user_input = request.form["user_input"]
 
-        if user_input.lower().strip() == "i'm interested" and "last_question" in session:
-            last_q = session["last_question"]
-            row = df[df["question"] == last_q].iloc[0]
-            full_info = row["full_answer"] + f"<br><a href='{row['URL']}' target='_blank'>Read More</a>"
+        if user_input.lower() == "i'm interested" and "last_question_index" in session:
+            idx = session["last_question_index"]
+            full_answer = df.loc[idx, "full_answer"]
+            url = df.loc[idx, "URL"]
         else:
-            try:
-                X_test = vectorizer.transform([user_input])
-                pred = model.predict(X_test)[0]
-                pred = str(pred)
-                row = df[df["question"] == pred].iloc[0]
-                response = row["short_answer"]
-                session["last_question"] = pred
-            except Exception as e:
-                print("Prediction error:", e)
-                response = "Sorry, I couldn't find an answer for that."
+            # Vectorize input
+            X = vectorizer.transform([user_input])
+            prediction = model.predict(X)[0]
+            prediction = int(prediction) 
+            session["last_question_index"] = prediction
 
-    return render_template("index.html", response=response, full_info=full_info)
+            answer = df.loc[prediction, "short_answer"]
+
+    return render_template("index.html", answer=answer, full_answer=full_answer, url=url)
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 10000))  
     app.run(host="0.0.0.0", port=port)
