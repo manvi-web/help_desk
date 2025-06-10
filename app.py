@@ -1,61 +1,59 @@
-from flask import Flask, render_template, request, session
+from flask import Flask, request, render_template, session
 import pandas as pd
-import pickle
 import os
-import traceback  # for detailed error logging
+import pickle
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
 
 app = Flask(__name__)
-app.secret_key = "your_secret_key"
+app.secret_key = 'secret_key'
 
-try:
-    with open("chatbot_model.pkl", "rb") as f:
+# File paths
+csv_path = "chatbot_qa_dataset.csv"
+model_path = "chatbot_model.pkl"
+vectorizer_path = "vectorizer.pkl"
+
+# Load or train model
+if os.path.exists(model_path) and os.path.exists(vectorizer_path):
+    with open(model_path, "rb") as f:
         model = pickle.load(f)
-
-    with open("chatbot_vectorizer.pkl", "rb") as f:
+    with open(vectorizer_path, "rb") as f:
         vectorizer = pickle.load(f)
+    df = pd.read_csv(csv_path)
+else:
+    # Load data and train model
+    df = pd.read_csv(csv_path)
+    df.dropna(subset=['question', 'short_answer', 'full_answer', 'URL'], inplace=True)
+    X = df['question']
+    y = df.index
 
-    df = pd.read_csv("chatbot_qa_dataset.csv")
-except Exception as e:
-    print("❌ Error loading files:", e)
-    traceback.print_exc()
+    vectorizer = TfidfVectorizer()
+    X_vec = vectorizer.fit_transform(X)
+    model = LogisticRegression()
+    model.fit(X_vec, y)
+
+    with open(model_path, "wb") as f:
+        pickle.dump(model, f)
+    with open(vectorizer_path, "wb") as f:
+        pickle.dump(vectorizer, f)
 
 @app.route("/", methods=["GET", "POST"])
 def index():
     answer = ""
-    full_info = ""
+    if request.method == "POST":
+        user_input = request.form.get("question", "").strip()
+        last_question = session.get("last_question")
 
-    try:
-        if request.method == "POST":
-            user_input = request.form.get("user_input", "").strip().lower()
-
-            if user_input == "i'm interested" and "last_index" in session:
-                idx = session["last_index"]
-                full_answer = df.iloc[idx].get("full_answer", "Full answer not available.")
-                url = df.iloc[idx].get("URL", "")
-                full_info = f"{full_answer}<br><a href='{url}' target='_blank'>Read more</a>" if url else full_answer
-            elif user_input:
-                X = vectorizer.transform([user_input])
-                predicted_question = model.predict(X)[0]
-
-                # Fix: if the model returns int (label), convert it to string
-                if isinstance(predicted_question, (int, float)):
-                    predicted_question = str(predicted_question)
-
-                matches = df[df["question"].str.lower() == predicted_question.lower()]
-                if not matches.empty:
-                    idx = matches.index[0]
-                    session["last_index"] = idx
-                    short_answer = matches.iloc[0].get("short_answer", "No short answer found.")
-                    answer = f"Answer: {short_answer}"
-                else:
-                    answer = "Sorry, I couldn't find an answer for that."
-
-    except Exception as e:
-        print("❌ Error during request:", e)
-        traceback.print_exc()
-        answer = "❌ Internal error occurred."
-
-    return render_template("index.html", answer=answer, full_info=full_info)
+        if user_input.lower() == "i'm interested" and last_question is not None:
+            row = df.loc[last_question]
+            answer = f"{row['full_answer']}<br><br><a href='{row['URL']}' target='_blank'>Read more</a>"
+        else:
+            X_input = vectorizer.transform([user_input])
+            prediction = model.predict(X_input)[0]
+            session["last_question"] = prediction
+            row = df.loc[prediction]
+            answer = row["short_answer"]
+    return render_template("index.html", answer=answer)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
