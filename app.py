@@ -1,53 +1,58 @@
-import os
 from flask import Flask, request, render_template, session
 import pandas as pd
-import pickle
+import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
+import re
+import os
 
-# Load data
+app = Flask(__name__)
+app.secret_key = 'your-secret-key'
+
+# Port binding for Render
+PORT = int(os.environ.get("PORT", 10000))
+
+# Load dataset
 df = pd.read_csv("effort_qa_dataset.csv")
 
-# Convert all to string
-df['question'] = df['question'].astype(str)
-df['short_answer'] = df['short_answer'].astype(str)
-df['full_answer'] = df['full_answer'].astype(str)
-df['URL'] = df['URL'].astype(str)
+# Fill NaNs
+df.fillna("", inplace=True)
 
-# Prepare model
+# Preprocess questions
+questions = df["question"].astype(str).tolist()
 vectorizer = TfidfVectorizer()
-X = vectorizer.fit_transform(df['question'])
-model = LogisticRegression()
-model.fit(X, df.index)  # Target is the row index
+X = vectorizer.fit_transform(questions)
 
-# Flask setup
-app = Flask(__name__)
-app.secret_key = 'any-secret-key'  # For session
+# Train model
+model = LogisticRegression()
+model.fit(X, df.index)
 
 @app.route("/", methods=["GET", "POST"])
-def index():
-    answer = ""
-    full_answer = ""
-    url = ""
-    
+def home():
+    response = ""
     if request.method == "POST":
-        user_input = request.form["question"].strip()
-        
-        if user_input.lower() == "i'm interested":
-            if "last_index" in session:
-                idx = session["last_index"]
-                full_answer = df.loc[idx, "full_answer"]
-                url = df.loc[idx, "URL"]
-                answer = f"{full_answer}<br><br><a href='{url}' target='_blank'>Read more</a>"
-            else:
-                answer = "Please ask a question first."
+        user_input = request.form.get("user_input", "").strip().lower()
+
+        # If user previously asked a question and now says "I'm interested"
+        if "last_index" in session and "interested" in user_input:
+            idx = session["last_index"]
+            full_answer = df.loc[idx, "full_answer"]
+            url = df.loc[idx, "URL"]
+            response = f"<b>Full Answer:</b><br>{full_answer}<br><br><a href='{url}' target='_blank'>Read More</a>"
+            session.pop("last_index", None)
+
         else:
-            user_vector = vectorizer.transform([user_input])
-            pred_index = model.predict(user_vector)[0]
-            session["last_index"] = int(pred_index)  # store for later
-            answer = df.loc[pred_index, "short_answer"]
-    
-    return render_template("index.html", answer=answer)
+            # Predict index
+            vec = vectorizer.transform([user_input])
+            pred_idx = model.predict(vec)[0]
+
+            # Save for follow-up
+            session["last_index"] = int(pred_idx)
+
+            short_answer = df.loc[pred_idx, "short_answer"]
+            response = f"{short_answer}<br><br>Would you like to know more? Type <b>I'm interested</b>."
+
+    return render_template("index.html", response=response)
+
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=PORT)

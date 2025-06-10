@@ -1,48 +1,48 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Effort Helpdesk Chatbot</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 40px;
-        }
-        input[type="text"] {
-            width: 80%;
-            padding: 10px;
-            font-size: 16px;
-        }
-        button {
-            padding: 10px;
-            font-size: 16px;
-        }
-        .chatbox {
-            margin-top: 20px;
-            background: #f3f3f3;
-            padding: 15px;
-            border-radius: 10px;
-        }
-        .url-link {
-            margin-top: 10px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Effort Helpdesk</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f3f3f3;
+      padding: 30px;
+    }
+    .container {
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      max-width: 600px;
+      margin: auto;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    input, button {
+      padding: 10px;
+      font-size: 1em;
+      width: 100%;
+      margin-top: 10px;
+    }
+    .response {
+      margin-top: 20px;
+      padding: 10px;
+      background: #e8f4ff;
+      border-left: 4px solid #2196F3;
+    }
+  </style>
 </head>
 <body>
-    <h1>Effort Manual Helpdesk</h1>
+  <div class="container">
+    <h2>Effort Helpdesk Chatbot</h2>
     <form method="POST">
-        <input type="text" name="message" placeholder="Ask your question here..." required />
-        <button type="submit">Ask</button>
+      <input type="text" name="user_input" placeholder="Ask your question here..." required>
+      <button type="submit">Submit</button>
     </form>
-
     {% if response %}
-        <div class="chatbox">
-            <p>{{ response }}</p>
-            {% if url %}
-                <div class="url-link">
-                    <a href="{{ url }}" target="_blank">Read more here</a>
-                </div>
-            {% endif %}
-        </div>
+      <div class="response">
+        {{ response | safe }}
+      </div>
     {% endif %}
+  </div>
 </body>
 </html>
