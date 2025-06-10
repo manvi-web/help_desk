@@ -3,70 +3,49 @@ import pandas as pd
 import pickle
 import os
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key'
+app.secret_key = "supersecretkey"
 
-# Paths
-DATASET_PATH = 'chatbot_qa_dataset.csv'
-MODEL_PATH = 'chatbot_model.pkl'
-VECTORIZER_PATH = 'vectorizer.pkl'
+# Load CSV
+csv_path = "chatbot_qa_dataset.csv"
+df = pd.read_csv(csv_path)
+df["question"] = df["question"].astype(str)
 
-# Load or train the model
-if os.path.exists(MODEL_PATH) and os.path.exists(VECTORIZER_PATH):
-    with open(MODEL_PATH, 'rb') as f:
-        model = pickle.load(f)
-    with open(VECTORIZER_PATH, 'rb') as f:
-        vectorizer = pickle.load(f)
-    df = pd.read_csv(DATASET_PATH)
-else:
-    # Load dataset
-    df = pd.read_csv(DATASET_PATH)
-    df.dropna(subset=['question', 'short_answer', 'full_answer', 'URL'], inplace=True)
+# Load model and vectorizer
+with open("vectorizer.pkl", "rb") as f:
+    vectorizer = pickle.load(f)
 
-    # Vectorize questions
-    vectorizer = TfidfVectorizer()
-    X = vectorizer.fit_transform(df['question'])
-    y = df.index  # Using row index as the label
+with open("model.pkl", "rb") as f:
+    model = pickle.load(f)
 
-    # Train model
-    model = LogisticRegression()
-    model.fit(X, y)
-
-    # Save model and vectorizer
-    with open(MODEL_PATH, 'wb') as f:
-        pickle.dump(model, f)
-    with open(VECTORIZER_PATH, 'wb') as f:
-        pickle.dump(vectorizer, f)
-
-@app.route('/', methods=['GET', 'POST'])
+@app.route("/", methods=["GET", "POST"])
 def index():
-    answer = None
-    if request.method == 'POST':
-        user_input = request.form['user_input'].strip()
-        if not user_input:
-            answer = "❌ Please enter a question."
-        elif user_input.lower() == "i'm interested":
-            if 'last_index' in session:
-                idx = session['last_index']
-                full_answer = df.loc[idx, 'full_answer']
-                url = df.loc[idx, 'URL']
-                answer = f"{full_answer} 👉 <a href='{url}' target='_blank'>Read more</a>"
-            else:
-                answer = "❌ Please ask a question first."
+    response = ""
+    full_info = ""
+
+    if request.method == "POST":
+        user_input = request.form["message"]
+
+        if user_input.lower().strip() == "i'm interested" and "last_question" in session:
+            last_q = session["last_question"]
+            row = df[df["question"] == last_q].iloc[0]
+            full_info = row["full_answer"] + f"<br><a href='{row['URL']}' target='_blank'>Read More</a>"
         else:
             try:
-                X_input = vectorizer.transform([user_input])
-                prediction = model.predict(X_input)[0]
-                short_answer = df.loc[prediction, 'short_answer']
-                session['last_index'] = prediction
-                answer = short_answer
+                X_test = vectorizer.transform([user_input])
+                pred = model.predict(X_test)[0]
+                pred = str(pred)
+                row = df[df["question"] == pred].iloc[0]
+                response = row["short_answer"]
+                session["last_question"] = pred
             except Exception as e:
-                answer = f"❌ Internal error occurred: {str(e)}"
-    return render_template("index.html", answer=answer)
+                print("Prediction error:", e)
+                response = "Sorry, I couldn't find an answer for that."
 
-# For Render deployment
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    return render_template("index.html", response=response, full_info=full_info)
+
+if __name__ == "__main__":
+    # Use PORT environment variable if available (for Render, Heroku, etc.)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
