@@ -1,56 +1,49 @@
-from flask import Flask, request, render_template, session
+from flask import Flask, request, jsonify, render_template, session
 import pandas as pd
-import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
-import re
+from sklearn.metrics.pairwise import cosine_similarity
 import os
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key'
+app.secret_key = "helpdesk_secret_key"
 
 # Port binding for Render
 PORT = int(os.environ.get("PORT", 10000))
 
 # Load dataset
 df = pd.read_csv("effort_qa_dataset.csv")
-
-# Fill NaNs
 df.fillna("", inplace=True)
 
-# Preprocess questions
-questions = df["question"].astype(str).tolist()
+# Vectorize questions
 vectorizer = TfidfVectorizer()
-X = vectorizer.fit_transform(questions)
-
-# Train model
-model = LogisticRegression()
-model.fit(X, df.index)
+X = vectorizer.fit_transform(df['question'])
 
 @app.route("/", methods=["GET", "POST"])
-def home():
+def index():
     response = ""
     if request.method == "POST":
-        user_input = request.form.get("user_input", "").strip().lower()
+        user_input = request.form["message"].strip()
 
-        # If user previously asked a question and now says "I'm interested"
-        if "last_index" in session and "interested" in user_input:
-            idx = session["last_index"]
-            full_answer = df.loc[idx, "full_answer"]
-            url = df.loc[idx, "URL"]
-            response = f"<b>Full Answer:</b><br>{full_answer}<br><br><a href='{url}' target='_blank'>Read More</a>"
-            session.pop("last_index", None)
-
+        # If user says "I'm interested"
+        if user_input.lower() in ["i'm interested", "interested", "yes"]:
+            last_index = session.get("last_index")
+            if last_index is not None:
+                full = df.loc[last_index, "full_answer"]
+                url = df.loc[last_index, "url"]
+                response = f"Here's more info:\n\n{full}\n\nRead more: {url}"
+            else:
+                response = "Please ask a question first."
         else:
-            # Predict index
-            vec = vectorizer.transform([user_input])
-            pred_idx = model.predict(vec)[0]
+            # Compute similarity with questions
+            user_vec = vectorizer.transform([user_input])
+            similarities = cosine_similarity(user_vec, X)
+            best_index = similarities.argmax()
 
-            # Save for follow-up
-            session["last_index"] = int(pred_idx)
+            # Save last question
+            session["last_index"] = int(best_index)
 
-            short_answer = df.loc[pred_idx, "short_answer"]
-            response = f"{short_answer}<br><br>Would you like to know more? Type <b>I'm interested</b>."
+            short_ans = df.loc[best_index, "short_answer"]
+            response = f"{short_ans}\n\nWould you like to know more? Type 'I'm interested'."
 
     return render_template("index.html", response=response)
 
