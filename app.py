@@ -1,15 +1,13 @@
-from flask import Flask, render_template, request, session
+ffrom flask import Flask, render_template, request, session
 import pandas as pd
 import pickle
 import os
-from sklearn.feature_extraction.text import TfidfVectorizer
 
 app = Flask(__name__)
 app.secret_key = "supersecretkey"
 
 # Load CSV
-csv_path = "chatbot_qa_dataset.csv"
-df = pd.read_csv(csv_path)
+df = pd.read_csv("chatbot_qa_dataset.csv")
 df["question"] = df["question"].astype(str)
 
 # Load model and vectorizer
@@ -46,6 +44,5 @@ def index():
     return render_template("index.html", response=response, full_info=full_info)
 
 if __name__ == "__main__":
-    # Use PORT environment variable if available (for Render, Heroku, etc.)
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
