@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, session
 import pandas as pd
 import pickle
+import os
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -45,6 +46,6 @@ def index():
             session["last_question"] = matched_row.to_dict()
 
     return render_template("index.html", response=response)
-
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000, debug=True)
+    port = int(os.environ.get("PORT", 5000))  # Use PORT from environment or default to 5000
+    app.run(host="0.0.0.0", port=port)
