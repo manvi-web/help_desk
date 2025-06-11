@@ -1,48 +1,39 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Effort Help Desk Chatbot</title>
+    <title>Effort Help Desk</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            padding: 40px;
-            background: #f8f8f8;
-        }
-        h2 {
-            color: #333;
-        }
-        form {
-            margin-bottom: 20px;
-        }
+        body { font-family: Arial; padding: 30px; background: #f9f9f9; }
+        h1 { color: #333; }
+        form { margin-bottom: 20px; }
         input[type="text"] {
-            width: 60%;
+            width: 80%;
             padding: 10px;
             font-size: 16px;
         }
-        button {
+        input[type="submit"] {
             padding: 10px 20px;
             font-size: 16px;
         }
         .response {
             background: #fff;
-            padding: 20px;
             border: 1px solid #ddd;
-            width: 80%;
-            margin-top: 20px;
+            padding: 15px;
+            max-width: 90%;
+            white-space: pre-wrap;
         }
+        a { color: blue; }
     </style>
 </head>
 <body>
-    <h2>Effort Help Desk Chatbot</h2>
+    <h1>Effort Manual Help Desk</h1>
     <form method="post">
-        <input type="text" name="question" placeholder="Ask your question here..." required />
-        <button type="submit">Ask</button>
+        <input type="text" name="user_input" placeholder="Ask me anything..." required />
+        <input type="submit" value="Ask" />
     </form>
 
-    {% if answer %}
-        <div class="response">
-            {{ answer|safe }}
-        </div>
+    {% if response %}
+    <div class="response">{{ response|safe }}</div>
     {% endif %}
 </body>
 </html>
