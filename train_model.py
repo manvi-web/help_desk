@@ -1,37 +1,38 @@
 import pandas as pd
-import os
-import joblib
+import pickle
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import LabelEncoder
 
-# Auto-detect file location inside help_desk/
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-csv_path = os.path.join(BASE_DIR, "chatbot_qa_dataset.csv")
+# Step 1: Load CSV
+df = pd.read_csv("effort_qa_dataset.csv")
 
-# Load CSV
-df = pd.read_csv(csv_path)
+# Step 2: Rename columns to expected format
+df = df.rename(columns={
+    "question": "Title",
+    "short_answer": "Short Answer",
+    "full_answer": "Full Answer"
+})
 
-# Check required columns
-required_columns = ['question', 'short_answer', 'full_answer', 'URL']
-if not all(col in df.columns for col in required_columns):
-    raise ValueError(f"CSV must contain columns: {required_columns}")
+# Step 3: Validate required columns exist
+required_columns = ["Title", "Short Answer", "Full Answer", "URL"]
+for col in required_columns:
+    if col not in df.columns:
+        raise Exception(f"Missing column: {col}")
 
-# Encode short answers as labels
-le = LabelEncoder()
-y = le.fit_transform(df['short_answer'])
+# Step 4: Combine fields for training
+df["combined"] = df["Title"] + " " + df["Short Answer"] + " " + df["Full Answer"]
 
-# TF-IDF Vectorization
+# Step 5: Train TF-IDF model
 vectorizer = TfidfVectorizer()
-X = vectorizer.fit_transform(df['question'])
+tfidf_matrix = vectorizer.fit_transform(df["combined"])
 
-# Train model
-model = LogisticRegression()
-model.fit(X, y)
+# Step 6: Save model and data
+with open("vectorizer.pkl", "wb") as f:
+    pickle.dump(vectorizer, f)
 
-# Save model, vectorizer, label encoder
-joblib.dump(model, os.path.join(BASE_DIR, "chatbot_model.pkl"))
-joblib.dump(vectorizer, os.path.join(BASE_DIR, "vectorizer.pkl"))
-joblib.dump(le, os.path.join(BASE_DIR, "label_encoder.pkl"))
+with open("tfidf_matrix.pkl", "wb") as f:
+    pickle.dump(tfidf_matrix, f)
 
-print("✅ Model, vectorizer, and label encoder saved successfully.")
+with open("qa_dataframe.pkl", "wb") as f:
+    pickle.dump(df, f)
+
+print("✅ Training complete. Model and data saved.")

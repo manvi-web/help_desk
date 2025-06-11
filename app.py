@@ -1,47 +1,36 @@
+# app.py
 from flask import Flask, render_template, request, session
-import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer
+import pickle
 from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 
-# Load dataset
-df = pd.read_csv("effort_qa_dataset.csv")
-
-# Ensure all data is string
-df = df.fillna("")
-df["question"] = df["question"].astype(str)
-df["short_answer"] = df["short_answer"].astype(str)
-df["full_answer"] = df["full_answer"].astype(str)
-df["URL"] = df["URL"].astype(str)
-
-# Vectorize questions
-vectorizer = TfidfVectorizer()
-tfidf_matrix = vectorizer.fit_transform(df["question"])
+# Load model files
+vectorizer = pickle.load(open("vectorizer.pkl", "rb"))
+tfidf_matrix = pickle.load(open("tfidf_matrix.pkl", "rb"))
+df = pickle.load(open("qa_dataframe.pkl", "rb"))
 
 @app.route("/", methods=["GET", "POST"])
-def home():
-    response = ""
+def index():
+    answer = ""
     if request.method == "POST":
-        user_input = request.form["question"].strip().lower()
+        user_input = request.form["question"]
+        last_q_idx = session.get("last_q_idx")
 
-        if user_input == "i'm interested" and "last_index" in session:
-            idx = session["last_index"]
-            full_answer = df.loc[idx, "full_answer"]
-            url = df.loc[idx, "URL"]
-            response = f"{full_answer}<br><br><a href='{url}' target='_blank'>Click here for more info</a>"
+        if user_input.strip().lower() == "i'm interested" and last_q_idx is not None:
+            full_ans = df.iloc[last_q_idx]["Full Answer"]
+            url = df.iloc[last_q_idx]["URL"]
+            answer = f"{full_ans}<br><br><a href='{url}' target='_blank'>Read more</a>"
         else:
-            input_vector = vectorizer.transform([user_input])
-            similarity = cosine_similarity(input_vector, tfidf_matrix)
-            best_match_idx = similarity.argmax()
+            user_vec = vectorizer.transform([user_input])
+            sims = cosine_similarity(user_vec, tfidf_matrix)
+            best_match = np.argmax(sims)
+            session["last_q_idx"] = int(best_match)
+            answer = df.iloc[best_match]["Short Answer"] + "<br><br>Would you like to know more? Type 'I'm interested'."
 
-            short_answer = df.loc[best_match_idx, "short_answer"]
-            response = f"{short_answer}<br><br>Would you like to know more? Type 'I'm interested'."
-
-            session["last_index"] = int(best_match_idx)  # ✅ FIX: convert int64 to int
-
-    return render_template("index.html", response=response)
+    return render_template("index.html", answer=answer)
 
 if __name__ == "__main__":
-    app.run(debug=False, host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=5000)
