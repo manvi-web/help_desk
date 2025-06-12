@@ -1,36 +1,49 @@
-# app.py
-from flask import Flask, render_template, request, session
+from flask import Flask, request, jsonify, session
+from flask_cors import CORS
 import pickle
-from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+import os
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key'
+app.secret_key = "effort_bot_secret"
+CORS(app)
 
-# Load model files
-vectorizer = pickle.load(open("vectorizer.pkl", "rb"))
-tfidf_matrix = pickle.load(open("tfidf_matrix.pkl", "rb"))
-df = pickle.load(open("qa_dataframe.pkl", "rb"))
+# Load model/vectorizer/data
+with open("vectorizer.pkl", "rb") as f:
+    vectorizer = pickle.load(f)
 
-@app.route("/", methods=["GET", "POST"])
-def index():
-    answer = ""
-    if request.method == "POST":
-        user_input = request.form["question"]
-        last_q_idx = session.get("last_q_idx")
+with open("tfidf_matrix.pkl", "rb") as f:
+    tfidf_matrix = pickle.load(f)
 
-        if user_input.strip().lower() == "i'm interested" and last_q_idx is not None:
-            full_ans = df.iloc[last_q_idx]["Full Answer"]
-            url = df.iloc[last_q_idx]["URL"]
-            answer = f"{full_ans}<br><br><a href='{url}' target='_blank'>Read more</a>"
+with open("qa_dataframe.pkl", "rb") as f:
+    df = pickle.load(f)
+
+@app.route("/chat", methods=["POST"])
+def chat():
+    user_input = request.json["message"]
+
+    if user_input.lower().strip() == "i'm interested":
+        last_index = session.get("last_index")
+        if last_index is not None:
+            row = df.iloc[last_index]
+            return jsonify({
+                "response": f"{row['Full Answer']}\n🔗 Read more: {row['URL']}"
+            })
         else:
-            user_vec = vectorizer.transform([user_input])
-            sims = cosine_similarity(user_vec, tfidf_matrix)
-            best_match = np.argmax(sims)
-            session["last_q_idx"] = int(best_match)
-            answer = df.iloc[best_match]["Short Answer"] + "<br><br>Would you like to know more? Type 'I'm interested'."
+            return jsonify({"response": "❗ Please ask a question first."})
 
-    return render_template("index.html", answer=answer)
+    query_vec = vectorizer.transform([user_input])
+    similarities = cosine_similarity(query_vec, tfidf_matrix)
+    best_index = np.argmax(similarities)
+
+    session["last_index"] = int(best_index)
+    row = df.iloc[best_index]
+
+    return jsonify({
+        "response": f"{row['Short Answer']}\n👉 Type *I'm interested* for full info."
+    })
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    port = int(os.environ.get("PORT", 5000))  # Use PORT env var or default to 5000
+    app.run(host="0.0.0.0", port=port)
