@@ -57,6 +57,13 @@
     button:hover {
       background: #45a049;
     }
+    a {
+      color: #0066cc;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
@@ -78,7 +85,7 @@
       appendMessage("user", message);
       input.value = "";
 
-      const response = await fetch("http://localhost:5000/chat", {
+      const response = await fetch("/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message })
@@ -86,6 +93,10 @@
 
       const data = await response.json();
       appendMessage("bot", data.response);
+      
+      if (data.url) {
+        appendMessage("bot", `🔗 <a href="${data.url}" target="_blank">View full topic</a>`);
+      }
     }
 
     function appendMessage(sender, text) {

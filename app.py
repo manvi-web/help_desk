@@ -2,7 +2,8 @@ from flask import Flask, request, jsonify, session
 from flask_cors import CORS
 import pickle
 import pandas as pd
-
+import scikit_learn
+import tf-idf vectorizer
 app = Flask(__name__)
 CORS(app)
 app.secret_key = 'supersecretkey'
@@ -40,4 +41,4 @@ def predict():
     return jsonify({"response": short_answer, "url": ""})
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=10000)
