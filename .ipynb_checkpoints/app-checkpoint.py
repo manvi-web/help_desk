@@ -1,54 +1,54 @@
-from flask import Flask, request, jsonify, render_template, session
+from flask import Flask, request, render_template, session, jsonify
 from flask_cors import CORS
+import pandas as pd
 import pickle
-import os
 from sklearn.metrics.pairwise import cosine_similarity
 
 app = Flask(__name__)
 CORS(app)
-app.secret_key = 'your-secret-key'
+app.secret_key = 'your_secret_key'
 
-# Load artifacts
-with open("vectorizer.pkl", "rb") as f:
-    vectorizer = pickle.load(f)
-
-with open("tfidf_matrix.pkl", "rb") as f:
-    tfidf_matrix = pickle.load(f)
-
-with open("qa_dataframe.pkl", "rb") as f:
-    df = pickle.load(f)
+# Load model and data
+vectorizer = pickle.load(open('vectorizer.pkl', 'rb'))
+tfidf_matrix = pickle.load(open('tfidf_matrix.pkl', 'rb'))
+qa_df = pickle.load(open('qa_dataframe.pkl', 'rb'))
 
 @app.route('/')
 def home():
     return render_template('index.html')
 
-@app.route('/predict', methods=['POST'])
-def predict():
-    user_input = request.json.get("message", "").strip().lower()
+@app.route('/get', methods=['POST'])
+def chatbot_response():
+    user_input = request.json.get("message")
+    
+    if not user_input:
+        return jsonify({"response": "Please enter a question."})
 
-    if "interested" in user_input:
-        last_question = session.get("last_question", "")
-        if last_question and last_question in df['question'].values:
-            row = df[df['question'] == last_question].iloc[0]
-            return jsonify({"response": f"{row['full_answer']}\n\n🔗 More info: {row['url']}"})
-        return jsonify({"response": "Sorry, I don’t have more info."})
+    # Check if user said "I'm interested"
+    if user_input.strip().lower() == "i'm interested":
+        last_question = session.get("last_question")
+        if not last_question:
+            return jsonify({"response": "Please ask a question first."})
 
-    # TF-IDF match
-    user_vec = vectorizer.transform([user_input])
-    scores = cosine_similarity(user_vec, tfidf_matrix)
-    best_idx = scores.argmax()
-    best_score = scores[0, best_idx]
+        row = qa_df[qa_df['Question'] == last_question].iloc[0]
+        full_answer = f"{row['Full Answer']} \n\n[Read more]({row['URL']})"
+        return jsonify({"response": full_answer})
 
-    if best_score < 0.2:
+    # Search using TF-IDF
+    input_vec = vectorizer.transform([user_input])
+    similarities = cosine_similarity(input_vec, tfidf_matrix)
+    idx = similarities.argmax()
+    confidence = similarities[0, idx]
+
+    if confidence < 0.2:
         return jsonify({"response": "Sorry, I couldn’t find an answer."})
 
-    question = df.iloc[best_idx]['question']
-    short_answer = df.iloc[best_idx]['short_answer']
-
+    question = qa_df.iloc[idx]['Question']
+    short_answer = qa_df.iloc[idx]['Short Answer']
+    
     session['last_question'] = question
     return jsonify({"response": short_answer})
 
-# Render-specific port binding
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    # Bind to port 5000 and listen on all interfaces (important for deployment like Render)
+    app.run(host='0.0.0.0', port=5000, debug=True)
