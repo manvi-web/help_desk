@@ -1,54 +1,63 @@
-from flask import Flask, request, render_template, jsonify, session
+from flask import Flask, request, jsonify, render_template, session
 from flask_cors import CORS
 import pickle
+import pandas as pd
 import numpy as np
-import os
 from sklearn.metrics.pairwise import cosine_similarity
+import os
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key'
-
-# ✅ Enable CORS with credentials
+app.secret_key = 'your-secret-key'  # Required for session handling
 CORS(app, supports_credentials=True)
 
-# ✅ Session cookie settings for cross-origin support (Render)
-app.config['SESSION_COOKIE_SECURE'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'None'
-app.config['SESSION_COOKIE_HTTPONLY'] = True
+# Load model and data
+with open("vectorizer.pkl", "rb") as f:
+    vectorizer = pickle.load(f)
 
-# ✅ Load model files
-vectorizer = pickle.load(open('vectorizer.pkl', 'rb'))
-tfidf_matrix = pickle.load(open('tfidf_matrix.pkl', 'rb'))
-qa_df = pickle.load(open('qa_dataframe.pkl', 'rb'))
+with open("tfidf_matrix.pkl", "rb") as f:
+    tfidf_matrix = pickle.load(f)
 
-@app.route('/')
+with open("qa_dataframe.pkl", "rb") as f:
+    df = pickle.load(f)
+
+@app.route("/")
 def home():
-    return render_template('index.html')
+    return render_template("index.html")  # Make sure templates/index.html exists
 
-@app.route('/predict', methods=['POST'])
+@app.route("/predict", methods=["POST"])
 def predict():
-    session.permanent = True  # ✅ Make session persistent
+    data = request.get_json()
+    user_input = data.get("message", "").strip().lower()
 
-    user_input = request.json['message'].strip().lower()
+    # If user expresses interest
+    if user_input in ["i'm interested", "im interested", "interested"]:
+        last_q = session.get("last_question", "")
+        if last_q:
+            match = get_best_match(last_q)
+            if match is not None:
+                return jsonify({
+                    "response": f"{match['Full Answer']}\n\n🔗 {match['URL']}"
+                })
+        return jsonify({"response": "Sorry, I don’t know what you're interested in."})
 
-    if user_input == "i'm interested":
-        last_index = session.get('last_index')
-        if last_index is not None:
-            full_answer = qa_df.iloc[last_index]['Full Answer']
-            url = qa_df.iloc[last_index]['URL']
-            return jsonify({'response': f"{full_answer}\n\n🔗 More info: {url}"})
-        else:
-            return jsonify({'response': "❗Please ask a question first."})
+    # Save question to session
+    session["last_question"] = user_input
 
-    # ✅ Vectorize and find best match
-    user_vec = vectorizer.transform([user_input])
-    similarities = cosine_similarity(user_vec, tfidf_matrix)
-    best_match = int(np.argmax(similarities))
-    session['last_index'] = best_match
+    # Regular prediction
+    match = get_best_match(user_input)
+    if match is not None:
+        return jsonify({"response": match["Short Answer"]})
+    else:
+        return jsonify({"response": "Sorry, I couldn’t find an answer."})
 
-    short_answer = qa_df.iloc[best_match]['Short Answer']
-    return jsonify({'response': short_answer})
+def get_best_match(user_input):
+    vec = vectorizer.transform([user_input])
+    scores = cosine_similarity(vec, tfidf_matrix)
+    idx = np.argmax(scores)
+    if scores[0][idx] < 0.3:
+        return None
+    return df.iloc[idx]
 
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))  # Use PORT env var for Render
+    app.run(host="0.0.0.0", port=port)
