@@ -3,33 +3,18 @@
 <head>
     <title>Effort Helpdesk Chatbot</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        #chat {
-            border: 1px solid #ccc;
-            background: #fff;
-            padding: 10px;
-            height: 400px;
-            overflow-y: scroll;
-        }
-        .bot, .user {
-            margin: 10px 0;
-        }
-        .bot {
-            color: green;
-        }
-        .user {
-            color: blue;
-        }
+        body { font-family: Arial, sans-serif; background-color: #f5f5f5; padding: 20px; }
+        #chat { border: 1px solid #ccc; background: #fff; padding: 10px; height: 400px; overflow-y: scroll; }
+        .bot, .user { margin: 10px 0; }
+        .bot { color: green; }
+        .user { color: blue; }
     </style>
 </head>
 <body>
     <h2>Effort Helpdesk Chatbot</h2>
     <div id="chat"></div>
     <input type="text" id="message" placeholder="Ask your question..." style="width: 80%;" />
+    <input type="hidden" id="lastIndex" value="" />
     <button onclick="sendMessage()">Send</button>
 
     <script>
@@ -50,13 +35,20 @@
             appendMessage("user", msg);
             input.value = "";
 
+            const lastIndex = document.getElementById("lastIndex").value;
+
             fetch("/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: msg })
+                body: JSON.stringify({ message: msg, last_index: lastIndex })
             })
             .then(res => res.json())
-            .then(data => appendMessage("bot", data.response))
+            .then(data => {
+                appendMessage("bot", data.response);
+                if (data.index !== undefined) {
+                    document.getElementById("lastIndex").value = data.index;
+                }
+            })
             .catch(() => appendMessage("bot", "Error occurred."));
         }
     </script>
