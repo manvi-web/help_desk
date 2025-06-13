@@ -1,74 +1,64 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>Effort Helpdesk Chatbot</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f9f9f9;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 40px;
-    }
-    #chat-box {
-      width: 80%;
-      max-width: 700px;
-      border: 1px solid #ccc;
-      border-radius: 10px;
-      background: white;
-      padding: 20px;
-      margin-bottom: 10px;
-      height: 400px;
-      overflow-y: auto;
-    }
-    .user { color: blue; }
-    .bot { color: green; }
-    #user-input {
-      width: 80%;
-      padding: 10px;
-      font-size: 16px;
-    }
-    #send-btn {
-      padding: 10px 20px;
-      font-size: 16px;
-    }
-  </style>
+    <title>Effort Helpdesk Chatbot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        #chat {
+            border: 1px solid #ccc;
+            background: #fff;
+            padding: 10px;
+            height: 400px;
+            overflow-y: scroll;
+        }
+        .bot, .user {
+            margin: 10px 0;
+        }
+        .bot {
+            color: green;
+        }
+        .user {
+            color: blue;
+        }
+    </style>
 </head>
 <body>
-  <h2>Effort Helpdesk Chatbot</h2>
-  <div id="chat-box"></div>
-  <input type="text" id="user-input" placeholder="Ask your question..." />
-  <button id="send-btn">Send</button>
+    <h2>Effort Helpdesk Chatbot</h2>
+    <div id="chat"></div>
+    <input type="text" id="message" placeholder="Ask your question..." style="width: 80%;" />
+    <button onclick="sendMessage()">Send</button>
 
-  <script>
-    const chatBox = document.getElementById("chat-box");
-    const userInput = document.getElementById("user-input");
-    const sendBtn = document.getElementById("send-btn");
+    <script>
+        function appendMessage(sender, text) {
+            const chat = document.getElementById("chat");
+            const message = document.createElement("div");
+            message.className = sender;
+            message.innerText = `${sender === 'user' ? 'You' : 'Bot'}: ${text}`;
+            chat.appendChild(message);
+            chat.scrollTop = chat.scrollHeight;
+        }
 
-    function appendMessage(sender, message) {
-      const msg = document.createElement("div");
-      msg.className = sender;
-      msg.innerHTML = `<strong>${sender}:</strong> ${message}`;
-      chatBox.appendChild(msg);
-      chatBox.scrollTop = chatBox.scrollHeight;
-    }
+        function sendMessage() {
+            const input = document.getElementById("message");
+            const msg = input.value.trim();
+            if (!msg) return;
 
-    sendBtn.addEventListener("click", async () => {
-      const message = userInput.value.trim();
-      if (!message) return;
-      appendMessage("You", message);
-      userInput.value = "";
+            appendMessage("user", msg);
+            input.value = "";
 
-      const res = await fetch("/get", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
-      });
-      const data = await res.json();
-      appendMessage("Bot", data.response);
-    });
-  </script>
+            fetch("/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message: msg })
+            })
+            .then(res => res.json())
+            .then(data => appendMessage("bot", data.response))
+            .catch(() => appendMessage("bot", "Error occurred."));
+        }
+    </script>
 </body>
 </html>
