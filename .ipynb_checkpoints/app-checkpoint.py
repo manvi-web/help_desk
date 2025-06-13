@@ -3,6 +3,7 @@ from flask_cors import CORS
 import pandas as pd
 import pickle
 from sklearn.metrics.pairwise import cosine_similarity
+import os
 
 app = Flask(__name__)
 CORS(app)
@@ -19,22 +20,22 @@ def home():
 
 @app.route('/get', methods=['POST'])
 def chatbot_response():
-    user_input = request.json.get("message")
-    
-    if not user_input:
-        return jsonify({"response": "Please enter a question."})
+    user_input = request.json.get("message", "").strip()
 
-    # Check if user said "I'm interested"
-    if user_input.strip().lower() == "i'm interested":
+    if not user_input:
+        return jsonify({"response": "Please enter a valid question."})
+
+    # Handle "I'm interested"
+    if user_input.lower() == "i'm interested":
         last_question = session.get("last_question")
         if not last_question:
             return jsonify({"response": "Please ask a question first."})
 
         row = qa_df[qa_df['Question'] == last_question].iloc[0]
-        full_answer = f"{row['Full Answer']} \n\n[Read more]({row['URL']})"
+        full_answer = f"{row['Full Answer']}<br><br><a href='{row['URL']}' target='_blank'>Read more</a>"
         return jsonify({"response": full_answer})
 
-    # Search using TF-IDF
+    # Find best match
     input_vec = vectorizer.transform([user_input])
     similarities = cosine_similarity(input_vec, tfidf_matrix)
     idx = similarities.argmax()
@@ -45,10 +46,10 @@ def chatbot_response():
 
     question = qa_df.iloc[idx]['Question']
     short_answer = qa_df.iloc[idx]['Short Answer']
-    
+
     session['last_question'] = question
     return jsonify({"response": short_answer})
 
 if __name__ == '__main__':
-    # Bind to port 5000 and listen on all interfaces (important for deployment like Render)
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
