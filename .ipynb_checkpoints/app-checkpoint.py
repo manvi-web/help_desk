@@ -1,16 +1,14 @@
 from flask import Flask, request, jsonify, render_template, session
 from flask_cors import CORS
 import pickle
-import pandas as pd
-import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
 import os
+from sklearn.metrics.pairwise import cosine_similarity
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key'  # Required for session handling
-CORS(app, supports_credentials=True)
+CORS(app)
+app.secret_key = 'your-secret-key'
 
-# Load model and data
+# Load artifacts
 with open("vectorizer.pkl", "rb") as f:
     vectorizer = pickle.load(f)
 
@@ -20,44 +18,37 @@ with open("tfidf_matrix.pkl", "rb") as f:
 with open("qa_dataframe.pkl", "rb") as f:
     df = pickle.load(f)
 
-@app.route("/")
+@app.route('/')
 def home():
-    return render_template("index.html")  # Make sure templates/index.html exists
+    return render_template('index.html')
 
-@app.route("/predict", methods=["POST"])
+@app.route('/predict', methods=['POST'])
 def predict():
-    data = request.get_json()
-    user_input = data.get("message", "").strip().lower()
+    user_input = request.json.get("message", "").strip().lower()
 
-    # If user expresses interest
-    if user_input in ["i'm interested", "im interested", "interested"]:
-        last_q = session.get("last_question", "")
-        if last_q:
-            match = get_best_match(last_q)
-            if match is not None:
-                return jsonify({
-                    "response": f"{match['Full Answer']}\n\n🔗 {match['URL']}"
-                })
-        return jsonify({"response": "Sorry, I don’t know what you're interested in."})
+    if "interested" in user_input:
+        last_question = session.get("last_question", "")
+        if last_question and last_question in df['question'].values:
+            row = df[df['question'] == last_question].iloc[0]
+            return jsonify({"response": f"{row['full_answer']}\n\n🔗 More info: {row['url']}"})
+        return jsonify({"response": "Sorry, I don’t have more info."})
 
-    # Save question to session
-    session["last_question"] = user_input
+    # TF-IDF match
+    user_vec = vectorizer.transform([user_input])
+    scores = cosine_similarity(user_vec, tfidf_matrix)
+    best_idx = scores.argmax()
+    best_score = scores[0, best_idx]
 
-    # Regular prediction
-    match = get_best_match(user_input)
-    if match is not None:
-        return jsonify({"response": match["Short Answer"]})
-    else:
+    if best_score < 0.2:
         return jsonify({"response": "Sorry, I couldn’t find an answer."})
 
-def get_best_match(user_input):
-    vec = vectorizer.transform([user_input])
-    scores = cosine_similarity(vec, tfidf_matrix)
-    idx = np.argmax(scores)
-    if scores[0][idx] < 0.3:
-        return None
-    return df.iloc[idx]
+    question = df.iloc[best_idx]['question']
+    short_answer = df.iloc[best_idx]['short_answer']
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # Use PORT env var for Render
-    app.run(host="0.0.0.0", port=port)
+    session['last_question'] = question
+    return jsonify({"response": short_answer})
+
+# Render-specific port binding
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
