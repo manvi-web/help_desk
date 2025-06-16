@@ -10,7 +10,7 @@ app.secret_key = 'your_secret_key_here'
 # Load model artifacts
 vectorizer = pickle.load(open('vectorizer.pkl', 'rb'))
 tfidf_matrix = pickle.load(open('tfidf_matrix.pkl', 'rb'))
-qa_df = pickle.load(open('dataframe.pkl', 'rb'))
+qa_df = pickle.load(open('qa_dataframe.pkl', 'rb'))
 
 @app.route('/')
 def home():
