@@ -38,5 +38,7 @@ def chat():
     session['last_question_index'] = int(best_match_index)
 
     return jsonify({'response': short_answer})
-if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=10000)
+
+if __name__ == '__main__':
+ app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+
