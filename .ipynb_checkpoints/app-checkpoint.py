@@ -1,51 +1,42 @@
-from flask import Flask, request, jsonify, render_template
-from flask_cors import CORS
+from flask import Flask, request, jsonify, session
 import pandas as pd
 import pickle
 from sklearn.metrics.pairwise import cosine_similarity
 
 app = Flask(__name__)
-CORS(app)
+app.secret_key = 'your_secret_key_here'  # Required for session
 
-# Load data and models
-df = pd.read_csv("effort_qa_dataset_real_content.csv")
-
-with open("vectorizer.pkl", "rb") as f:
-    vectorizer = pickle.load(f)
-
-with open("tfidf_matrix.pkl", "rb") as f:
-    tfidf_matrix = pickle.load(f)
+# Load vectorizer, matrix, and dataset
+vectorizer = pickle.load(open('vectorizer.pkl', 'rb'))
+tfidf_matrix = pickle.load(open('tfidf_matrix.pkl', 'rb'))
+qa_df = pickle.load(open('qa_dataframe.pkl', 'rb'))  # Contains Title, Short Answer, Full Answer, URL
 
 @app.route('/')
 def home():
-    return render_template("index.html")
+    return '✅ Effort Helpdesk Chatbot API is running!'
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    data = request.get_json()
-    user_input = data.get("message", "").strip()
-    last_index = data.get("last_index")
+    user_message = request.json.get('message', '').strip().lower()
 
-    if not user_input:
-        return jsonify({"response": "Please ask a question."})
-
-    # Handle follow-up interest
-    if user_input.lower() == "i'm interested":
-        if last_index is not None and str(last_index).isdigit():
-            i = int(last_index)
-            full_answer = df.iloc[i]["Full Answer"]
-            url = df.iloc[i]["URL"]
-            return jsonify({"response": f"{full_answer}\n\nRead more: {url}"})
+    if user_message == "i'm interested":
+        last_index = session.get('last_question_index')
+        if last_index is not None:
+            full_answer = qa_df.iloc[last_index]['Full Answer']
+            url = qa_df.iloc[last_index]['URL']
+            return jsonify({'response': f"{full_answer}\nURL: {url}"})
         else:
-            return jsonify({"response": "Please ask a question first."})
+            return jsonify({'response': "Please ask a question first."})
 
-    # Otherwise, find best match using TF-IDF similarity
-    user_vec = vectorizer.transform([user_input])
-    similarities = cosine_similarity(user_vec, tfidf_matrix)
-    best_index = similarities.argmax()
-    short_answer = df.iloc[best_index]["Short Answer"]
+    # Handle new question
+    query_vec = vectorizer.transform([user_message])
+    similarity = cosine_similarity(query_vec, tfidf_matrix)
+    best_match_index = similarity.argmax()
+    short_answer = qa_df.iloc[best_match_index]['Short Answer']
 
-    return jsonify({"response": short_answer, "index": best_index})
+    # Store index in session for follow-up
+    session['last_question_index'] = int(best_match_index)
 
+    return jsonify({'response': short_answer})
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=10000)
