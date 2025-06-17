@@ -5,54 +5,53 @@ from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 import os
 
+# Load model and data
+with open("vectorizer.pkl", "rb") as f:
+    vectorizer = pickle.load(f)
+
+with open("tfidf_matrix.pkl", "rb") as f:
+    tfidf_matrix = pickle.load(f)
+
+with open("qa_dataframe.pkl", "rb") as f:
+    qa_df = pickle.load(f)
+
+# Initialize Flask app
 app = Flask(__name__)
-app.secret_key = "your_secret_key"
+app.secret_key = "your_secret_key"  # Set a secure secret key
+
+# Session config
 app.config["SESSION_TYPE"] = "filesystem"
+app.config["SESSION_FILE_DIR"] = "./flask_session/"
 Session(app)
 
-# Load trained files
-vectorizer = pickle.load(open("vectorizer.pkl", "rb"))
-tfidf_matrix = pickle.load(open("tfidf_matrix.pkl", "rb"))
-qa_df = pickle.load(open("qa_dataframe.pkl", "rb"))
-
-@app.route('/')
-def home():
+@app.route("/")
+def index():
     return render_template("index.html")
 
-@app.route('/chat', methods=['POST'])
+@app.route("/chat", methods=["POST"])
 def chat():
-    user_input = request.json['message'].strip().lower()
+    user_input = request.json["message"].strip().lower()
 
-    # Follow-up case: "I'm interested"
     if user_input == "i'm interested":
-        idx = session.get("last_index", None)
-        print("[DEBUG] User typed: I'm interested")
-        print(f"[DEBUG] last_index from session: {idx}")
-        
-        if idx is None:
-            return jsonify({"response": "❗ Please ask a question first."})
+        idx = session.get("last_index")
+        if idx is not None:
+            full_answer = qa_df.iloc[idx]["Full Answer"]
+            url = qa_df.iloc[idx]["URL"]
+            response = f"{full_answer}<br><a href='{url}' target='_blank'>{url}</a>"
+            return jsonify({"response": response})
+        else:
+            return jsonify({"response": "Please ask a question first."})
 
-        full_answer = qa_df.iloc[idx].get('Full Answer', 'No full answer found.')
-        url = qa_df.iloc[idx].get('URL', 'No URL available.')
-        print(f"[DEBUG] Returning full answer: {full_answer[:60]}... and URL: {url}")
-        return jsonify({"response": f"{full_answer}\n\n🔗 More info: {url}"})
-
-    # Normal question handling
+    # Vectorize the input and find best match
     user_vec = vectorizer.transform([user_input])
-    similarity = cosine_similarity(user_vec, tfidf_matrix)
-    idx = int(np.argmax(similarity))
+    sims = cosine_similarity(user_vec, tfidf_matrix)
+    idx = np.argmax(sims)
 
-    session['last_index'] = idx
-    title = qa_df.iloc[idx].get('Title', '')
-    short_answer = qa_df.iloc[idx].get('Short Answer', 'No short answer found.')
-
-    print(f"[DEBUG] Matched question: '{user_input}' to index: {idx}")
-    print(f"[DEBUG] Title: {title}")
-    print(f"[DEBUG] Short Answer: {short_answer[:60]}...")
-
+    short_answer = qa_df.iloc[idx]["Short Answer"]
+    session["last_index"] = idx  # Save index for follow-up
+    print(f"[DEBUG] last_index set to: {idx}")
+    
     return jsonify({"response": short_answer})
 
-# ✅ Port binding for Render
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(debug=True, port=5000)
