@@ -1,0 +1,35 @@
+import pandas as pd
+import pickle
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+# Step 1: Load your dataset
+df = pd.read_csv("effort_qa_dataset.csv")
+
+# Step 2: Check for missing values
+df.fillna("", inplace=True)  # Replace NaN with empty strings
+
+# Step 3: Save the dataframe as a pickle for the chatbot
+with open("qa_dataframe.pkl", "wb") as f:
+    pickle.dump(df, f)
+
+# Step 4: Create a corpus for vectorization
+# You can use 'Title' + 'Short Answer' + 'Full Answer' to improve search
+corpus = (df['Title'] + " " + df['Short Answer'] + " " + df['Full Answer']).tolist()
+
+# Step 5: Train the TF-IDF Vectorizer
+vectorizer = TfidfVectorizer(stop_words='english')
+tfidf_matrix = vectorizer.fit_transform(corpus)
+
+# Step 6: Save the vectorizer and tf-idf matrix
+with open("vectorizer.pkl", "wb") as f:
+    pickle.dump(vectorizer, f)
+
+with open("tfidf_matrix.pkl", "wb") as f:
+    pickle.dump(tfidf_matrix, f)
+
+print("✅ Training complete! Files saved:")
+print("- qa_dataframe.pkl")
+print("- vectorizer.pkl")
+print("- tfidf_matrix.pkl")
+
+
