@@ -23,22 +23,33 @@ def home():
 def chat():
     user_input = request.json['message'].strip().lower()
 
+    # Follow-up case: "I'm interested"
     if user_input == "i'm interested":
         idx = session.get("last_index", None)
+        print("[DEBUG] User typed: I'm interested")
+        print(f"[DEBUG] last_index from session: {idx}")
+        
         if idx is None:
             return jsonify({"response": "❗ Please ask a question first."})
-        
+
         full_answer = qa_df.iloc[idx].get('Full Answer', 'No full answer found.')
         url = qa_df.iloc[idx].get('URL', 'No URL available.')
+        print(f"[DEBUG] Returning full answer: {full_answer[:60]}... and URL: {url}")
         return jsonify({"response": f"{full_answer}\n\n🔗 More info: {url}"})
 
-    # Regular question flow
+    # Normal question handling
     user_vec = vectorizer.transform([user_input])
     similarity = cosine_similarity(user_vec, tfidf_matrix)
     idx = int(np.argmax(similarity))
-    session['last_index'] = idx
 
+    session['last_index'] = idx
+    title = qa_df.iloc[idx].get('Title', '')
     short_answer = qa_df.iloc[idx].get('Short Answer', 'No short answer found.')
+
+    print(f"[DEBUG] Matched question: '{user_input}' to index: {idx}")
+    print(f"[DEBUG] Title: {title}")
+    print(f"[DEBUG] Short Answer: {short_answer[:60]}...")
+
     return jsonify({"response": short_answer})
 
 # ✅ Port binding for Render
