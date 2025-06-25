@@ -2,6 +2,6 @@ pandas
 flask
 scikit-learn
 gunicorn
-flask_cors
 numpy
+flask_cors
 flask-session
